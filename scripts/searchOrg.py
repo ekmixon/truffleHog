@@ -33,7 +33,10 @@ for key in rules:
     rules[key] = re.compile(rules[key])
 
 def get_org_repos(orgname, page):
-    response = requests.get(url='https://api.github.com/users/' + orgname + '/repos?page={}'.format(page))
+    response = requests.get(
+        url=f'https://api.github.com/users/{orgname}' + f'/repos?page={page}'
+    )
+
     json = response.json()
     if not json:
         return None
@@ -44,10 +47,10 @@ def get_org_repos(orgname, page):
             results = truffleHog.find_strings(item["html_url"], do_regex=True, custom_regexes=rules, do_entropy=False, max_depth=100000)
             for issue in results["foundIssues"]:
                 d = loads(open(issue).read())
-                d['github_url'] = "{}/blob/{}/{}".format(item["html_url"], d['commitHash'], d['path'])
-                d['github_commit_url'] = "{}/commit/{}".format(item["html_url"], d['commitHash'])
-                d['diff'] = d['diff'][0:200]
-                d['printDiff'] = d['printDiff'][0:200]
+                d['github_url'] = f"""{item["html_url"]}/blob/{d['commitHash']}/{d['path']}"""
+                d['github_commit_url'] = f"""{item["html_url"]}/commit/{d['commitHash']}"""
+                d['diff'] = d['diff'][:200]
+                d['printDiff'] = d['printDiff'][:200]
                 print(dumps(d, indent=4))
     get_org_repos(orgname, page + 1)
 get_org_repos("Twitter", 1)

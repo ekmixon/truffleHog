@@ -42,10 +42,7 @@ class TestStringMethods(unittest.TestCase):
         cross_valdiating_commit_w_secret_comment = 'Oh no a secret file'
 
         json_result = ''
-        if sys.version_info >= (3,):
-            tmp_stdout = io.StringIO()
-        else:
-            tmp_stdout = io.BytesIO()
+        tmp_stdout = io.StringIO() if sys.version_info >= (3,) else io.BytesIO()
         bak_stdout = sys.stdout
 
         # Redirect STDOUT, run scan and re-establish STDOUT
@@ -88,51 +85,108 @@ class TestStringMethods(unittest.TestCase):
             'moved-file-sub-dir-to-root-dir': Blob('sub-dir/moved-file', 'moved-file'),
             'moved-file-sub-dir-to-sub-dir': Blob('sub-dir/moved-file', 'moved/moved-file'),
         }
-        src_paths = set(blob.a_path for blob in blobs.values() if blob.a_path is not None)
-        dest_paths = set(blob.b_path for blob in blobs.values() if blob.b_path is not None)
+        src_paths = {blob.a_path for blob in blobs.values() if blob.a_path is not None}
+        dest_paths = {
+            blob.b_path for blob in blobs.values() if blob.b_path is not None
+        }
+
         all_paths = src_paths.union(dest_paths)
         all_paths_patterns = [re.compile(re.escape(p)) for p in all_paths]
         overlap_patterns = [re.compile(r'sub-dir/.*'), re.compile(r'moved/'), re.compile(r'[^/]*file$')]
         sub_dirs_patterns = [re.compile(r'.+/.+')]
         deleted_paths_patterns = [re.compile(r'(.*/)?deleted-file$')]
         for name, blob in blobs.items():
-            self.assertTrue(truffleHog.path_included(blob),
-                            '{} should be included by default'.format(blob))
-            self.assertTrue(truffleHog.path_included(blob, include_patterns=all_paths_patterns),
-                            '{} should be included with include_patterns: {}'.format(blob, all_paths_patterns))
-            self.assertFalse(truffleHog.path_included(blob, exclude_patterns=all_paths_patterns),
-                             '{} should be excluded with exclude_patterns: {}'.format(blob, all_paths_patterns))
-            self.assertFalse(truffleHog.path_included(blob,
-                                                      include_patterns=all_paths_patterns,
-                                                      exclude_patterns=all_paths_patterns),
-                             '{} should be excluded with overlapping patterns: \n\tinclude: {}\n\texclude: {}'.format(
-                                 blob, all_paths_patterns, all_paths_patterns))
-            self.assertFalse(truffleHog.path_included(blob,
-                                                      include_patterns=overlap_patterns,
-                                                      exclude_patterns=all_paths_patterns),
-                             '{} should be excluded with overlapping patterns: \n\tinclude: {}\n\texclude: {}'.format(
-                                 blob, overlap_patterns, all_paths_patterns))
-            self.assertFalse(truffleHog.path_included(blob,
-                                                      include_patterns=all_paths_patterns,
-                                                      exclude_patterns=overlap_patterns),
-                             '{} should be excluded with overlapping patterns: \n\tinclude: {}\n\texclude: {}'.format(
-                                 blob, all_paths_patterns, overlap_patterns))
-            path = blob.b_path if blob.b_path else blob.a_path
+            self.assertTrue(
+                truffleHog.path_included(blob),
+                f'{blob} should be included by default',
+            )
+
+            self.assertTrue(
+                truffleHog.path_included(
+                    blob, include_patterns=all_paths_patterns
+                ),
+                f'{blob} should be included with include_patterns: {all_paths_patterns}',
+            )
+
+            self.assertFalse(
+                truffleHog.path_included(
+                    blob, exclude_patterns=all_paths_patterns
+                ),
+                f'{blob} should be excluded with exclude_patterns: {all_paths_patterns}',
+            )
+
+            self.assertFalse(
+                truffleHog.path_included(
+                    blob,
+                    include_patterns=all_paths_patterns,
+                    exclude_patterns=all_paths_patterns,
+                ),
+                f'{blob} should be excluded with overlapping patterns: \n\tinclude: {all_paths_patterns}\n\texclude: {all_paths_patterns}',
+            )
+
+            self.assertFalse(
+                truffleHog.path_included(
+                    blob,
+                    include_patterns=overlap_patterns,
+                    exclude_patterns=all_paths_patterns,
+                ),
+                f'{blob} should be excluded with overlapping patterns: \n\tinclude: {overlap_patterns}\n\texclude: {all_paths_patterns}',
+            )
+
+            self.assertFalse(
+                truffleHog.path_included(
+                    blob,
+                    include_patterns=all_paths_patterns,
+                    exclude_patterns=overlap_patterns,
+                ),
+                f'{blob} should be excluded with overlapping patterns: \n\tinclude: {all_paths_patterns}\n\texclude: {overlap_patterns}',
+            )
+
+            path = blob.b_path or blob.a_path
             if '/' in path:
-                self.assertTrue(truffleHog.path_included(blob, include_patterns=sub_dirs_patterns),
-                                '{}: inclusion should include sub directory paths: {}'.format(blob, sub_dirs_patterns))
-                self.assertFalse(truffleHog.path_included(blob, exclude_patterns=sub_dirs_patterns),
-                                 '{}: exclusion should exclude sub directory paths: {}'.format(blob, sub_dirs_patterns))
+                self.assertTrue(
+                    truffleHog.path_included(
+                        blob, include_patterns=sub_dirs_patterns
+                    ),
+                    f'{blob}: inclusion should include sub directory paths: {sub_dirs_patterns}',
+                )
+
+                self.assertFalse(
+                    truffleHog.path_included(
+                        blob, exclude_patterns=sub_dirs_patterns
+                    ),
+                    f'{blob}: exclusion should exclude sub directory paths: {sub_dirs_patterns}',
+                )
+
             else:
-                self.assertFalse(truffleHog.path_included(blob, include_patterns=sub_dirs_patterns),
-                                 '{}: inclusion should exclude root directory paths: {}'.format(blob, sub_dirs_patterns))
-                self.assertTrue(truffleHog.path_included(blob, exclude_patterns=sub_dirs_patterns),
-                                '{}: exclusion should include root directory paths: {}'.format(blob, sub_dirs_patterns))
+                self.assertFalse(
+                    truffleHog.path_included(
+                        blob, include_patterns=sub_dirs_patterns
+                    ),
+                    f'{blob}: inclusion should exclude root directory paths: {sub_dirs_patterns}',
+                )
+
+                self.assertTrue(
+                    truffleHog.path_included(
+                        blob, exclude_patterns=sub_dirs_patterns
+                    ),
+                    f'{blob}: exclusion should include root directory paths: {sub_dirs_patterns}',
+                )
+
             if name.startswith('deleted-file-'):
-                self.assertTrue(truffleHog.path_included(blob, include_patterns=deleted_paths_patterns),
-                                '{}: inclusion should match deleted paths: {}'.format(blob, deleted_paths_patterns))
-                self.assertFalse(truffleHog.path_included(blob, exclude_patterns=deleted_paths_patterns),
-                                 '{}: exclusion should match deleted paths: {}'.format(blob, deleted_paths_patterns))
+                self.assertTrue(
+                    truffleHog.path_included(
+                        blob, include_patterns=deleted_paths_patterns
+                    ),
+                    f'{blob}: inclusion should match deleted paths: {deleted_paths_patterns}',
+                )
+
+                self.assertFalse(
+                    truffleHog.path_included(
+                        blob, exclude_patterns=deleted_paths_patterns
+                    ),
+                    f'{blob}: exclusion should match deleted paths: {deleted_paths_patterns}',
+                )
 
 
 
